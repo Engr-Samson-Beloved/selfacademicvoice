@@ -271,7 +271,7 @@ Rules:
 - Keep any {{CIT_n}} placeholder exactly as written, wherever it appears in the sentence
 - Keep any list MARKER exactly ("1", "2.", "•", "-") — it is document structure
 - But a "Label: explanation" opening is NOT structure, it is wording. Rewrite it into a flowing sentence in the author's voice rather than preserving the label and colon. "Touchless operation: removes the need to touch surfaces" should become something like "Touchless operation removes the need of touching common surfaces". Never leave a capitalised label followed by a colon
-- Match the original's length closely. Say everything the original says — do NOT summarise, compress, or drop clauses. A rewrite that is much shorter than the original has deleted the author's content and is wrong
+- Carry over every point the original makes — do not summarise, drop a clause, or leave a fact out. But express those points in clearly DIFFERENT words and a different clause order. Completeness of content and freshness of wording are both required; do not trade one for the other by staying close to the original's phrasing
 - Use the "(Between: ...)" context only to fit the sentence naturally; never copy words from it into your rewritten sentence
 - Self-check before answering: compare each sentence you wrote against the author's example passages in the system prompt. If it sounds too clean, smooth, modern, or AI-like, rewrite it again internally. Also confirm it is NOT a near-copy of the original sentence
 - Return only the numbered rewritten sentences, nothing else"""
@@ -505,7 +505,7 @@ Rules:
 - Change at least half the words; reorder the clauses; do not keep the original's phrasing
 - Keep all facts and any citation exactly; keep any {{CIT_n}} placeholder exactly as written
 - Keep any list MARKER ("1", "2.", "•", "-"), but rewrite a "Label: explanation" opening into a flowing sentence — do not preserve the label and colon
-- Say everything the original says; do not shorten or drop clauses
+- Carry over every point the original makes, but in different words — do not shorten, and do not stay close to the original's phrasing
 - Do not add new ideas or append evaluative clauses
 - Return only the numbered rewritten sentences, nothing else"""
         result = llm.ask(prompt, system_prompt=system_prompt, temperature=config.REWRITE_TEMPERATURE)
