@@ -222,9 +222,14 @@ docker compose up --build
 Or without compose:
 
 ```bash
-docker build -t selfacademicvoice .
+docker build -f deploy/Dockerfile -t selfacademicvoice .
 docker run -p 8000:8000 --env-file .env selfacademicvoice
 ```
+
+> The Dockerfile lives in `deploy/`, **not** the repo root. Pxxl detects a root
+> Dockerfile and replays its `RUN` lines outside a real Docker context, which
+> breaks the build; keeping it out of the root is what stops that. Pass
+> `-f deploy/Dockerfile` (compose and CI already do).
 
 The image is a two-stage build on `python:3.12-slim`, runs as a non-root user
 (uid 10001), and carries a `HEALTHCHECK` against `/health`. The generated
@@ -270,10 +275,13 @@ anything Docker-specific:
 /pxxl-input/build.sh: 9: apt-get: not found
 ```
 
-So `.pxxlignore` excludes `Dockerfile`, `.dockerignore` and `docker-compose.yml`,
-and `pxxl.toml` carries the buildpack config instead (`[build]` schema, Python
-3.12, `python -m api.main`, port 8000). Set `GEMINI_API_SECRET` and any other
-secrets as Pxxl environment secrets — never in `pxxl.toml`.
+`.pxxlignore` alone is **not** enough: it only filters CLI-packaged deploys, so a
+GitHub-connected build still detected the root Dockerfile and failed again on
+`useradd: not found`. The Dockerfile therefore lives in **`deploy/Dockerfile`**,
+outside the root where Pxxl looks. `pxxl.toml` carries the buildpack config
+instead (`[build]` schema, Python 3.12, `python -m api.main`, port 8000). Set
+`GEMINI_API_SECRET` and any other secrets as Pxxl environment secrets — never in
+`pxxl.toml`.
 
 **Railway, Render, Fly, or plain `docker compose`** do real Docker builds, so use
 the `Dockerfile` there. Alternatively set the start command to:

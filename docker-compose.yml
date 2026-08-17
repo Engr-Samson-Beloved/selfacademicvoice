@@ -1,6 +1,10 @@
 services:
   api:
-    build: .
+    build:
+      context: .
+      # Kept out of the repo root: Pxxl detects a root Dockerfile and replays
+      # its RUN lines outside a real Docker context, which breaks the deploy.
+      dockerfile: deploy/Dockerfile
     image: selfacademicvoice:latest
     ports:
       - "${PORT:-8000}:8000"

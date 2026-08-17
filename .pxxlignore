@@ -8,7 +8,10 @@
 #
 # The Dockerfile is still correct for real Docker builds (compose, Railway,
 # Render, Fly) and is verified by CI. It just must not reach Pxxl.
-Dockerfile
+# .pxxlignore only filters CLI-packaged deploys, so it did NOT stop a
+# GitHub-connected build from detecting a root Dockerfile. That is why the
+# Dockerfile now lives in deploy/ instead of the repo root.
+deploy/
 .dockerignore
 docker-compose.yml
 
