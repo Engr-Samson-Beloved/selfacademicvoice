@@ -1,0 +1,5 @@
+language = "python"
+framework = "fastapi"
+pythonVersion = "3.12"
+startCommand = "python -m api.main"
+port = 8000

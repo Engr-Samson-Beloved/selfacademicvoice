@@ -1,0 +1,268 @@
+{
+  "words": 2555,
+  "n_sentences": 81,
+  "mean_len": 31.493827160493826,
+  "median_len": 25,
+  "stdev_len": 28.46055249491488,
+  "pct_under_20": 37.03703703703704,
+  "pct_under_10": 9.876543209876543,
+  "pct_over_45": 19.753086419753085,
+  "length_deciles": [
+    9,
+    12,
+    17,
+    20,
+    25,
+    31,
+    38,
+    46,
+    57
+  ],
+  "commas_per_sentence": 1.5555555555555556,
+  "commas_p90": 4,
+  "len_p90": 55,
+  "semicolons": 1,
+  "dashes": 2,
+  "and_per_sentence": 1.2469135802469136,
+  "connector_pct": 22.22222222222222,
+  "connectors": [
+    [
+      "Also",
+      4
+    ],
+    [
+      "Furthermore",
+      3
+    ],
+    [
+      "Further more",
+      2
+    ],
+    [
+      "Finally",
+      2
+    ],
+    [
+      "More so",
+      1
+    ],
+    [
+      "Thus",
+      1
+    ],
+    [
+      "Therefore",
+      1
+    ],
+    [
+      "Similarly",
+      1
+    ],
+    [
+      "To this end",
+      1
+    ],
+    [
+      "Recently",
+      1
+    ],
+    [
+      "Right Now",
+      1
+    ]
+  ],
+  "citation_forms": [
+    "According to Iwhiwhu and Patience (2012)",
+    "studies the relation o f economics to social values Rontos (2013)",
+    "onomic development this is supported by the saying of Boyce (2008)",
+    "in shaping development outcomes as contained in World Bank (2005)",
+    "According to Rontos (2013)",
+    "ms and capabilities to live their lives as they choose UNDP (2009)",
+    "t also focuses on the outcomes of the enlarged choices UNDP (2002)",
+    "adopted for the study is survey design, Aina and Ajiferuke (2002)"
+  ],
+  "trailing_citations": 3,
+  "midcaps": [
+    "Abled",
+    "Academic",
+    "Average",
+    "Building",
+    "Collection",
+    "Department",
+    "Development",
+    "Fiction",
+    "Floor",
+    "General",
+    "Government",
+    "Income",
+    "Information",
+    "Language",
+    "Libraries",
+    "Library",
+    "Magazines",
+    "National",
+    "Once",
+    "People",
+    "Political",
+    "Public",
+    "Regd",
+    "Region",
+    "School",
+    "Status",
+    "Students",
+    "Table",
+    "Tools",
+    "User",
+    "Users",
+    "When"
+  ],
+  "fixed_coinages": [
+    [
+      "none registered",
+      13
+    ],
+    [
+      "freely abled",
+      11
+    ],
+    [
+      "non registered",
+      6
+    ],
+    [
+      "are/is satisfy",
+      3
+    ],
+    [
+      "in year <YYYY>",
+      3
+    ],
+    [
+      "Further more",
+      2
+    ],
+    [
+      "has increase",
+      1
+    ],
+    [
+      "all works of life",
+      1
+    ]
+  ],
+  "structural_phrases": [
+    [
+      "members of the community",
+      3
+    ],
+    [
+      "source of reading",
+      3
+    ],
+    [
+      "adopted for the study",
+      2
+    ],
+    [
+      "especially in developing countries",
+      2
+    ],
+    [
+      "study shows that majority",
+      2
+    ],
+    [
+      "filled and returned",
+      2
+    ],
+    [
+      "established in year",
+      2
+    ],
+    [
+      "department of language",
+      2
+    ],
+    [
+      "between the ages",
+      2
+    ],
+    [
+      "non regd user",
+      2
+    ]
+  ],
+  "domain_terms": [
+    [
+      "non registered users",
+      6
+    ],
+    [
+      "abled users are of the view",
+      4
+    ],
+    [
+      "tools for socio-economic and political development",
+      3
+    ],
+    [
+      "selected public libraries in kota region",
+      3
+    ],
+    [
+      "public libraries in kota region rajasthan",
+      3
+    ],
+    [
+      "libraries in kota region of rajasthan",
+      3
+    ],
+    [
+      "knowledge and information",
+      3
+    ],
+    [
+      "public libraries as tools for socio-economic",
+      2
+    ],
+    [
+      "raja ram mohun roy library foundation",
+      2
+    ],
+    [
+      "users of public libraries in kota",
+      2
+    ]
+  ],
+  "topic_words": [
+    "users",
+    "public",
+    "libraries",
+    "registered",
+    "library",
+    "development",
+    "information",
+    "kota",
+    "political",
+    "freely",
+    "rajasthan",
+    "abled",
+    "socio-economic",
+    "none",
+    "region"
+  ],
+  "passages": [
+    "Education is an instrument par exce llence for national development.",
+    "The analysis is based on simple frequency count and percentages.",
+    "It is established in 1956 and having Collection of about 47067 Books.",
+    "The study is limited to public libraries in Kota region of Rajasthan.",
+    "Education solely depends on the availability of the right information at the right time.",
+    "This is the reason why information is seen as an integral part of national development.",
+    "Public Library undoubtedly enhances the socio-economic and political development of both users in Kota region of Rajasthan.",
+    "Also from the interview most users agreed that their level of political awareness has improved since visiting the library.",
+    "According to Iwhiwhu and Patience (2012) “People in all works of life use the public library resources, facilities and services.",
+    "Human development refers to the expansion of people’s freedoms and capabilities to live their lives as they choose UNDP (2009).",
+    "Anita Mathur and it is situated in School building so both School Students and Rural People can benefit from the public library.",
+    "Information and its effective, proper dissemination and util ization are an integral and very powerful force to reckon with in socio-economic and political development ."
+  ]
+}

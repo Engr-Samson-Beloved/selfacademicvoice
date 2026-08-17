@@ -1,0 +1,19 @@
+# secrets
+.env
+
+# python
+venv/
+__pycache__/
+*.pyc
+
+# sample / source documents (keep out of git)
+*.docx
+*.Zone.Identifier
+*.pdf
+
+# runtime data
+data/rewritten/
+data/dataset/
+data/vector_db/
+data/example_report/
+data/input/
