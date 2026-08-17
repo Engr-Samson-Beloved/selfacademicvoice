@@ -53,13 +53,28 @@ def _retry_delay(message: str) -> float:
     return float(m.group(1)) if m else 15.0
 
 
+def _msg(e: Exception) -> str:
+    """Exception text including its cause chain.
+
+    _ask_gemini wraps the rotation's failures in a RuntimeError summary, so the
+    original provider codes live on __cause__. Matching only str(e) would miss
+    them and misclassify a quota failure as unrecoverable.
+    """
+    parts, seen, cur = [], set(), e
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        parts.append(str(cur))
+        cur = cur.__cause__ or cur.__context__
+    return " | ".join(parts)
+
+
 def _is_quota_error(e: Exception) -> bool:
-    msg = str(e)
+    msg = _msg(e)
     return "429" in msg or "RESOURCE_EXHAUSTED" in msg
 
 
 def _is_retryable_quota(e: Exception) -> bool:
-    msg = str(e)
+    msg = _msg(e)
     return "429" in msg and "perminute" in msg.lower()
 
 
@@ -72,17 +87,17 @@ def _is_connection_error(e: Exception) -> bool:
 
 
 def _is_model_unavailable(e: Exception) -> bool:
-    msg = str(e)
+    msg = _msg(e)
     return "404" in msg or "NOT_FOUND" in msg
 
 
 def _is_overloaded(e: Exception) -> bool:
-    msg = str(e)
+    msg = _msg(e)
     return "503" in msg or "UNAVAILABLE" in msg
 
 
 def _is_server_error(e: Exception) -> bool:
-    msg = str(e)
+    msg = _msg(e)
     return "500" in msg or "INTERNAL" in msg
 
 
@@ -141,15 +156,32 @@ def _available_models():
     return [config.GEMINI_MODEL] + [m for m in DEFAULT_GEMINI_MODELS if m != config.GEMINI_MODEL]
 
 
+def _classify(e: Exception) -> str:
+    msg = str(e)
+    if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
+        return "daily quota exhausted" if "PerDay" in msg else "rate limited"
+    if "503" in msg or "UNAVAILABLE" in msg:
+        return "overloaded"
+    if "500" in msg or "INTERNAL" in msg:
+        return "server error"
+    if "404" in msg or "NOT_FOUND" in msg:
+        return "not available to this key"
+    if "API_KEY_INVALID" in msg or "API key not valid" in msg:
+        return "invalid key"
+    return type(e).__name__
+
+
 def _ask_gemini(prompt: str, system_prompt: str, temperature: float) -> str:
     keys = _api_keys()
     if not keys:
         raise RuntimeError("No GEMINI_API_KEY set")
     last_err = None
+    outcomes: list[str] = []
     deadline = time.monotonic() + 150.0
     for model in _available_models():
         if time.monotonic() >= deadline:
-            break
+            outcomes.append(f"{model}: not tried (deadline)")
+            continue
         for api_key in keys:
             try:
                 return _ask_gemini_with_key(
@@ -157,8 +189,15 @@ def _ask_gemini(prompt: str, system_prompt: str, temperature: float) -> str:
                 )
             except Exception as e:
                 last_err = e
+                outcomes.append(f"{model}: {_classify(e)}")
+
     if last_err is not None:
-        raise last_err
+        # Previously this re-raised only the LAST model's error, so a request
+        # that failed on overload across the whole rotation surfaced as whatever
+        # the final fallback model happened to say - usually a quota message
+        # naming a model that was never the real problem.
+        summary = "; ".join(outcomes)
+        raise RuntimeError(f"all Gemini models failed -> {summary}") from last_err
     raise RuntimeError("No Gemini key/model available")
 
 

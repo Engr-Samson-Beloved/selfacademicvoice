@@ -31,6 +31,50 @@ def test_ordinary_error_is_not_a_fallback_error():
     assert not llm._is_fallback_error(Exception("400 INVALID_ARGUMENT: bad request"))
 
 
+def test_classification_follows_the_cause_chain():
+    """_ask_gemini wraps rotation failures in a RuntimeError summary, so the
+    provider's status code lives on __cause__. Matching only str(e) would
+    misread a quota failure as unrecoverable and skip the Groq fallback."""
+    try:
+        try:
+            raise Exception(QUOTA_ERROR)
+        except Exception as inner:
+            raise RuntimeError("all Gemini models failed -> "
+                               "gemini-3-flash: daily quota exhausted") from inner
+    except RuntimeError as wrapped:
+        assert llm._is_quota_error(wrapped), "quota not seen through the cause chain"
+        assert llm._is_fallback_error(wrapped)
+
+
+def test_rotation_summary_names_every_model():
+    """The old code re-raised only the last model's error, so an overloaded
+    rotation surfaced as a quota message naming a model that was never the
+    real problem."""
+    saved_models = llm._available_models
+    saved_call = llm._ask_gemini_with_key
+    llm._available_models = lambda: ["model-a", "model-b", "model-c"]
+
+    def boom(api_key, model, *a, **k):
+        raise Exception("503 UNAVAILABLE" if model != "model-c" else QUOTA_ERROR)
+
+    llm._ask_gemini_with_key = boom
+    os.environ[config.GEMINI_API_SECRET] = "k"
+    try:
+        try:
+            llm._ask_gemini("p", None, 0.5)
+        except RuntimeError as e:
+            msg = str(e)
+            for m in ("model-a", "model-b", "model-c"):
+                assert m in msg, f"{m} missing from summary: {msg}"
+            assert "overloaded" in msg and "quota" in msg, msg
+            return
+        raise AssertionError("no error raised")
+    finally:
+        llm._available_models = saved_models
+        llm._ask_gemini_with_key = saved_call
+        os.environ.pop(config.GEMINI_API_SECRET, None)
+
+
 def _with_stubs(gemini_exc, groq_reply, groq_key):
     saved = (llm._ask_gemini, llm._ask_groq, os.environ.get(config.GROQ_API_KEY))
     calls = {"groq": 0}
