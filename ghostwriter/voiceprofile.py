@@ -606,6 +606,31 @@ def banned_connectives(profile: Profile) -> list[str]:
     return [c for c in DEFAULT_BANNED if c.lower() not in attested]
 
 
+# A rewrite may keep no more than this fraction below the original's length.
+SHRINK_FLOOR = 0.70
+# Contiguous words shared with the source before it reads as "not rewritten".
+VERBATIM_RUN_LIMIT = 8
+
+
+def _longest_shared_run(a: str, b: str) -> tuple[int, str]:
+    """Longest contiguous run of words two sentences share.
+
+    Token-set overlap cannot distinguish "reworded but dense with unchangeable
+    technical terms" from "opening clause copied verbatim". Both score high. A
+    reader only notices the second, so measure it directly: one sentence here
+    carried 25 consecutive words straight through while scoring only 0.85.
+    """
+    from difflib import SequenceMatcher
+
+    wa, wb = a.lower().split(), b.lower().split()
+    if not wa or not wb:
+        return 0, ""
+    m = SequenceMatcher(None, wa, wb, autojunk=False).find_longest_match(
+        0, len(wa), 0, len(wb)
+    )
+    return m.size, " ".join(wa[m.a:m.a + m.size])
+
+
 def sentence_violations(profile: Profile, rewritten: str, original: str) -> list[str]:
     """Voice-rule breaches in one rewritten sentence, as instructions to fix.
 
@@ -632,6 +657,21 @@ def sentence_violations(profile: Profile, rewritten: str, original: str) -> list
         problems.append(
             f"shorten to about {orig_words} words (currently {words}; "
             f"this author rarely exceeds {profile.len_p90})"
+        )
+    # The mirror of the check above. Without it the model compresses instead of
+    # rewriting: a 68-word sentence came back as 11 words, deleting the author's
+    # content outright, and nothing flagged it because only inflation was tested.
+    elif orig_words >= 15 and words < orig_words * SHRINK_FLOOR:
+        problems.append(
+            f"you dropped content - this must say everything the original said. "
+            f"Expand back to roughly {orig_words} words (currently {words})"
+        )
+
+    run, run_text = _longest_shared_run(rewritten, original)
+    if run >= VERBATIM_RUN_LIMIT:
+        problems.append(
+            f'rephrase "{run_text[:70]}" - {run} words are copied from the '
+            f"original word for word"
         )
 
     commas, orig_commas = rewritten.count(","), original.count(",")

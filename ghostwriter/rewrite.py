@@ -32,6 +32,20 @@ def is_heading(text):
     return False
 
 
+_REFERENCES_HEADING_RE = re.compile(
+    r"^\s*(?:\d+[.)]?\s*)?"
+    r"(references?|bibliography|works\s+cited|list\s+of\s+references|"
+    r"reference\s+list|citations?)\s*:?\s*$",
+    re.IGNORECASE,
+)
+
+
+def is_references_heading(text):
+    """True for a heading that opens a reference list."""
+    stripped = text.strip().lstrip("#").strip()
+    return bool(stripped) and bool(_REFERENCES_HEADING_RE.match(stripped))
+
+
 def split_document(text):
     paragraphs = []
     for p in re.split(r"\n\n|(?=###\s)", text):
@@ -409,6 +423,16 @@ def _collapse_line_breaks(text):
 def rewrite_document(document, system_prompt):
     document = _collapse_line_breaks(sanitize_footers(document))
     paras = [p for p in document.split("\n\n") if p.strip()]
+
+    # Split off any reference list and re-attach it untouched at the end.
+    references = []
+    for idx, para in enumerate(paras):
+        if is_references_heading(para):
+            references = paras[idx:]
+            paras = paras[:idx]
+            log.info("references section held back (%d paragraphs)", len(references))
+            break
+
     deduped = []
     seen_paras = []
     for para in paras:
@@ -485,6 +509,26 @@ Rules:
         result = llm.ask(prompt, system_prompt=system_prompt, temperature=config.REWRITE_TEMPERATURE)
         rewrites.update(_parse_numbered(result))
 
+    # Report what the similarity gate could not fix. Previously these fell
+    # through silently, so a sentence left as a near-copy of the source was
+    # indistinguishable from one that had been rewritten well.
+    unresolved = [
+        n for n, orig in original_map.items()
+        if rewrites.get(n) and _overlap(rewrites[n], orig) >= 0.7
+    ]
+    missing = [n for n in original_map if not rewrites.get(n)]
+    if unresolved:
+        log.warning(
+            "similarity gate: %d of %d sentence(s) still >=0.70 overlap with the "
+            "source after %d retries", len(unresolved), len(original_map), 2
+        )
+    if missing:
+        log.warning(
+            "similarity gate: %d sentence(s) were never returned by the model and "
+            "fall back to the ORIGINAL text - lower GHOSTWRITER_CHUNK_SIZE",
+            len(missing),
+        )
+
     # The similarity gate above only measures distance from the source sentence.
     # The voice gate measures conformance to the author's own measured habits.
     _apply_voice_gate(rewrites, original_map, system_prompt)
@@ -503,6 +547,8 @@ Rules:
         rebuilt.append(" ".join(p for p in parts if p))
 
     final = cap_document(document, "\n\n".join(rebuilt))
+    if references:
+        final = final + "\n\n" + "\n\n".join(references)
     _log_document_drift(final)
     return final
 
@@ -734,9 +780,24 @@ def rewrite_docx(file_bytes: bytes, system_prompt: str) -> bytes:
     doc = Document(io.BytesIO(file_bytes))
     original = list(doc.paragraphs)
 
+    # Everything from a "References"/"Bibliography" heading onward is left
+    # exactly as the author wrote it. Reference entries are not prose: journal
+    # and conference names cannot be reworded (they came back byte-identical,
+    # which reads as "not rewritten"), and when the model did reword them it
+    # corrupted real citations - retitling published papers and injecting the
+    # author's "in year" coinage into them.
+    refs_start = len(original)
+    for i, p in enumerate(original):
+        if is_references_heading(p.text):
+            refs_start = i
+            log.info("references section starts at paragraph %d; left verbatim", i)
+            break
+
     raw = []
     cite_counter = [0]
     for i, p in enumerate(original):
+        if i >= refs_start:
+            break
         visible_text, records, run_spans = citations.extract(p, cite_counter)
         text = re.sub(r"\n", " ", visible_text).strip()
         if not text:

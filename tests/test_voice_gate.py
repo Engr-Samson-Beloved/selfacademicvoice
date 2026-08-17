@@ -57,6 +57,45 @@ def test_comma_inflation_flagged():
     assert any("commas" in p for p in problems), problems
 
 
+def test_content_deletion_flagged():
+    """Regression: only length INFLATION was checked, so the model compressed
+    instead of rewriting - a 68-word sentence came back as 11, silently."""
+    orig = ("A Gesture-Controlled Music Player is one practical realisation of this "
+            "idea, because instead of pressing physical buttons, tapping a touchscreen "
+            "or clicking a mouse, the user simply raises a hand in front of the camera "
+            "and the system reads the pose and dispatches the matching command.")
+    compressed = "One practical application of this concept is a Gesture-Controlled Music Player."
+    problems = voiceprofile.sentence_violations(PROFILE, compressed, orig)
+    assert any("dropped content" in p for p in problems), problems
+
+
+def test_short_original_not_flagged_for_shrinkage():
+    """Short sentences legitimately get shorter; the floor only applies to
+    originals long enough for the loss to mean something."""
+    orig = "Education depends on information."
+    problems = voiceprofile.sentence_violations(PROFILE, "Learning needs information.", orig)
+    assert not any("dropped content" in p for p in problems), problems
+
+
+def test_verbatim_run_flagged():
+    """A long copied run reads as 'not rewritten' even at moderate token
+    overlap. One real sentence carried 25 consecutive words through at 0.85."""
+    orig = ("The specific problem addressed in this seminar can be stated as follows: "
+            "design and evaluate a system that captures live video from a standard "
+            "webcam and classifies the resulting hand poses.")
+    copied = ("The specific problem addressed in this seminar can be stated as follows: "
+              "design and evaluate a System that reads webcam video and sorts hand poses.")
+    problems = voiceprofile.sentence_violations(PROFILE, copied, orig)
+    assert any("word for word" in p for p in problems), problems
+
+
+def test_genuine_rewrite_has_no_long_verbatim_run():
+    orig = "Public libraries are established to provide timely information resources."
+    good = "Prompt information materials reach the community through Public Library."
+    assert not any("word for word" in p
+                   for p in voiceprofile.sentence_violations(PROFILE, good, orig))
+
+
 def test_clean_sentence_passes():
     orig = "Education solely depends on the availability of information."
     good = "Education depends only on having the right information at the right time."
@@ -130,6 +169,54 @@ def test_read_corpus_rejects_unknown_suffix():
         raise AssertionError("unknown suffix was not rejected")
     finally:
         tmp.unlink(missing_ok=True)
+
+
+# --------------------------------------------------------- references handling
+
+def test_references_heading_detected():
+    for t in ("REFERENCES", "References", "Bibliography", "WORKS CITED",
+              "7. REFERENCES", "References:", "Reference List", "### References"):
+        assert rewrite.is_references_heading(t), t
+
+
+def test_references_heading_not_overmatched():
+    for t in ("The references show that gesture control works well",
+              "METHODOLOGY", "1.2 Problem Definition",
+              "This section references prior work on hand tracking"):
+        assert not rewrite.is_references_heading(t), t
+
+
+def test_reference_list_is_not_rewritten():
+    """Reference entries must survive byte-identical.
+
+    They were previously fed to the rewriter, which either returned them
+    unchanged (journal names are not rewordable) or corrupted them - retitling
+    published papers and injecting the author's coinages into citations.
+    """
+    citation = ("Zhang, F., Bazarevsky, V., & Grundmann, M. (2020). MediaPipe Hands: "
+                "On-device real-time hand tracking (arXiv:2006.10214). arXiv.")
+    document = (
+        "Public libraries are established to provide timely information resources "
+        "to all members of the community.\n\n"
+        "REFERENCES\n\n" + citation
+    )
+    replies = {1: "Public libraries exist so that prompt resources reach the community."}
+
+    class LLM(FakeLLM):
+        def __call__(self, prompt, system_prompt=None, temperature=None):
+            assert "MediaPipe Hands" not in prompt, "citation was sent to the model"
+            return super().__call__(prompt, system_prompt, temperature)
+
+    fake = LLM(replies)
+    original_ask = llm.ask
+    llm.ask = fake
+    try:
+        out = rewrite.rewrite_document(document, "system")
+    finally:
+        llm.ask = original_ask
+
+    assert citation in out, "reference entry was altered or dropped"
+    assert "REFERENCES" in out, "reference heading was dropped"
 
 
 # ------------------------------------------------------- integration: the gate
