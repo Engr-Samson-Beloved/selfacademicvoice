@@ -49,17 +49,37 @@ def extract_pdf(path: Path) -> str:
     return "\n\n".join((page.extract_text() or "") for page in reader.pages)
 
 
+def extract_docx(path: Path) -> str:
+    import docx
+
+    d = docx.Document(str(path))
+    return "\n\n".join(p.text for p in d.paragraphs if p.text.strip())
+
+
+_READERS = {".pdf": extract_pdf, ".docx": extract_docx}
+_SUFFIXES = (".pdf", ".docx", ".txt", ".md")
+
+
 def read_corpus(target: Path) -> str:
-    """Read a .pdf/.txt file, or concatenate every .pdf/.txt in a directory."""
+    """Read a .pdf/.docx/.txt/.md file, or concatenate every such file in a dir.
+
+    .docx matters for --check: the pipeline's own output is .docx, and without a
+    reader here it was being read as raw bytes from the zip container, producing
+    measurements from binary noise rather than from the document.
+    """
     if target.is_dir():
-        files = sorted(
-            p for p in target.iterdir() if p.suffix.lower() in (".pdf", ".txt")
-        )
+        files = sorted(p for p in target.iterdir() if p.suffix.lower() in _SUFFIXES)
         if not files:
-            raise SystemExit(f"no .pdf or .txt files in {target}")
+            raise SystemExit(f"no {'/'.join(_SUFFIXES)} files in {target}")
         return "\n\n".join(read_corpus(p) for p in files)
-    if target.suffix.lower() == ".pdf":
-        return extract_pdf(target)
+
+    reader = _READERS.get(target.suffix.lower())
+    if reader:
+        return reader(target)
+    if target.suffix.lower() not in (".txt", ".md"):
+        raise SystemExit(
+            f"cannot read {target.name}: expected one of {', '.join(_SUFFIXES)}"
+        )
     return target.read_text(encoding="utf8", errors="replace")
 
 
@@ -408,8 +428,12 @@ def render(p: Profile) -> str:
         "## PUNCTUATION AND CLAUSE JOINING",
         "=" * 70,
         "",
-        f"- Commas: {p.commas_per_sentence:.2f} per sentence. This is LOW. Do not pile up",
-        "  comma-separated subordinate clauses.",
+        f"- Commas: aim for about {p.commas_per_sentence:.1f} per sentence across the passage",
+        f"  (the author's measured rate; typical range {max(0, p.commas_per_sentence-0.5):.1f}-"
+        f"{p.commas_per_sentence+0.5:.1f}, up to {p.commas_p90} in a long sentence).",
+        "  This is a TARGET, not a ceiling. Do not strip commas out to sound clean:",
+        "  comma-free clipped sentences miss this author as badly as overloaded ones.",
+        "  The author joins clauses with commas and \"and\", just not in every sentence.",
         f'- "and" as a joiner: {p.and_per_sentence:.2f} per sentence.',
         f"- Semicolons in the entire corpus: {p.semicolons}. Em/en dashes: {p.dashes}.",
         "  Treat both as effectively unavailable.",
@@ -529,7 +553,9 @@ def render(p: Profile) -> str:
         "1. Count the words in each sentence you wrote. Compare against the deciles",
         f"   above ({p.length_deciles}). If your spread is narrower than the author's,",
         "   rewrite: split some sentences, run others together.",
-        f"2. Count your commas. If you are above {p.commas_per_sentence:.1f} per sentence, cut them.",
+        f"2. Count your commas. Aim for roughly {p.commas_per_sentence:.1f} per sentence overall -",
+        "   add them if you are well below, cut them if you are well above. Both",
+        "   directions are a mismatch.",
         "3. Check you used no forbidden connective and no semicolon or em-dash.",
         "4. Confirm every citation and placeholder survived unchanged.",
         "",
@@ -656,9 +682,14 @@ def compare(profile: Profile, candidate: str) -> list[tuple[str, str, str, bool]
     row("% under 20 words", profile.pct_under_20, pu20,
         abs(pu20 - profile.pct_under_20) <= 15, "{:.0f}")
 
+    # Two-sided. An earlier one-sided check (commas <= target + 0.6) passed a
+    # document using 0.18 commas per sentence against an author who uses 1.56 -
+    # an 8x undershoot that read as clipped and machine-clean, and the audit was
+    # blind to it. Undershooting a voice trait is as much a mismatch as
+    # overshooting it.
     commas = sum(s.count(",") for s in sents) / n
     row("commas per sentence", profile.commas_per_sentence, commas,
-        commas <= profile.commas_per_sentence + 0.6)
+        abs(commas - profile.commas_per_sentence) <= 0.6)
 
     for label, pattern, allowed in (
         ("semicolons", r";", profile.semicolons),

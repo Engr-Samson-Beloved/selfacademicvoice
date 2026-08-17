@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import os
 import time
 import uuid
 from datetime import datetime
@@ -9,6 +11,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 import ghostwriter
+
+# uvicorn configures its own loggers but leaves the root logger untouched, so
+# without this the engine's INFO output - including the voice gate's repair
+# counts and the per-document drift report - is silently dropped in production.
+# Those lines are the only visibility into whether the gate is doing anything.
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    format="%(levelname)s:%(name)s:%(message)s",
+)
 
 app = FastAPI(
     title="GhostWriter API",

@@ -24,8 +24,11 @@ Put genuinely short sentences next to long ones.
 ## PUNCTUATION AND CLAUSE JOINING
 ======================================================================
 
-- Commas: 1.56 per sentence. This is LOW. Do not pile up
-  comma-separated subordinate clauses.
+- Commas: aim for about 1.6 per sentence across the passage
+  (the author's measured rate; typical range 1.1-2.1, up to 4 in a long sentence).
+  This is a TARGET, not a ceiling. Do not strip commas out to sound clean:
+  comma-free clipped sentences miss this author as badly as overloaded ones.
+  The author joins clauses with commas and "and", just not in every sentence.
 - "and" as a joiner: 1.25 per sentence.
 - Semicolons in the entire corpus: 1. Em/en dashes: 2.
   Treat both as effectively unavailable.
@@ -151,7 +154,9 @@ reproduce broken words. Every other irregularity below IS the author's.)
 1. Count the words in each sentence you wrote. Compare against the deciles
    above ([9, 12, 17, 20, 25, 31, 38, 46, 57]). If your spread is narrower than the author's,
    rewrite: split some sentences, run others together.
-2. Count your commas. If you are above 1.6 per sentence, cut them.
+2. Count your commas. Aim for roughly 1.6 per sentence overall -
+   add them if you are well below, cut them if you are well above. Both
+   directions are a mismatch.
 3. Check you used no forbidden connective and no semicolon or em-dash.
 4. Confirm every citation and placeholder survived unchanged.
 

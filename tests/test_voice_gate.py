@@ -69,6 +69,69 @@ def test_profile_json_roundtrip(tmp_path=Path("data")):
     assert reloaded.connectors and isinstance(reloaded.connectors[0], tuple)
 
 
+# ------------------------------------------------------ regressions: the audit
+
+def _comma_row(text):
+    return next(r for r in voiceprofile.compare(PROFILE, text)
+                if r[0] == "commas per sentence")
+
+
+def test_check_flags_comma_undershoot():
+    """Regression: the comma check was one-sided, so output using 0.18 commas
+    per sentence against an author who uses 1.56 passed silently."""
+    clipped = " ".join(
+        "The system detects the hand and maps it to a control instruction." for _ in range(12)
+    )
+    label, author_val, cand_val, ok = _comma_row(clipped)
+    assert not ok, f"undershoot not flagged (author {author_val}, candidate {cand_val})"
+
+
+def test_check_still_flags_comma_overshoot():
+    overloaded = " ".join(
+        "The system, which is large, detects the hand, maps it, and, in turn, acts."
+        for _ in range(12)
+    )
+    _, _, _, ok = _comma_row(overloaded)
+    assert not ok, "overshoot no longer flagged"
+
+
+def test_check_passes_matching_comma_rate():
+    """The author's own corpus must not trip the two-sided check."""
+    _, _, _, ok = _comma_row(voiceprofile.read_corpus(Path("myvoice")))
+    assert ok, "author corpus fails its own comma check"
+
+
+def test_read_corpus_reads_docx():
+    """Regression: .docx fell through to read_text(), so --check on the
+    pipeline's own output measured raw zip bytes instead of the document."""
+    import docx
+
+    tmp = Path("data/_test_reader.docx")
+    d = docx.Document()
+    d.add_paragraph("Public libraries are established to provide information resources.")
+    d.add_paragraph("Education depends on the right information at the right time.")
+    d.save(tmp)
+    try:
+        text = voiceprofile.read_corpus(tmp)
+        assert "Public libraries" in text, f"docx not parsed, got: {text[:60]!r}"
+        assert "PK" not in text[:4], "read raw zip bytes instead of document text"
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def test_read_corpus_rejects_unknown_suffix():
+    tmp = Path("data/_test_reader.bin")
+    tmp.write_bytes(b"\x00\x01\x02")
+    try:
+        try:
+            voiceprofile.read_corpus(tmp)
+        except SystemExit:
+            return
+        raise AssertionError("unknown suffix was not rejected")
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 # ------------------------------------------------------- integration: the gate
 
 class FakeLLM:
