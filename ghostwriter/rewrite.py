@@ -8,6 +8,8 @@ from pathlib import Path
 from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from docx.table import Table
+from docx.text.paragraph import Paragraph
 
 from . import config, llm, citations, voiceprofile
 
@@ -555,6 +557,54 @@ Rules:
     return final
 
 
+def _cell_paragraphs(cell, doc, seen):
+    """Paragraphs in a cell, descending into nested tables.
+
+    Merged cells appear once per spanned column in ``row.cells``, so the same
+    paragraph would otherwise be yielded several times and rewritten twice.
+    """
+    for p in cell.paragraphs:
+        key = id(p._p)
+        if key not in seen:
+            seen.add(key)
+            yield p
+    for nested in cell.tables:
+        yield from _table_paragraphs(nested, doc, seen)
+
+
+def _table_paragraphs(table, doc, seen):
+    for row in table.rows:
+        for cell in row.cells:
+            yield from _cell_paragraphs(cell, doc, seen)
+
+
+def iter_paragraphs(doc):
+    """Every paragraph in document order, including inside table cells.
+
+    ``doc.paragraphs`` returns body-level paragraphs only: anything inside a
+    ``<w:tbl>`` is invisible to it. Iterating it alone meant table prose was
+    never sent to the model and passed through byte-identical, however it read.
+    """
+    seen = set()
+    for child in doc.element.body.iterchildren():
+        if child.tag == qn("w:p"):
+            key = id(child)
+            if key not in seen:
+                seen.add(key)
+                yield Paragraph(child, doc)
+        elif child.tag == qn("w:tbl"):
+            yield from _table_paragraphs(Table(child, doc), doc, seen)
+
+
+def _in_table(paragraph):
+    parent = paragraph._p.getparent()
+    while parent is not None:
+        if parent.tag == qn("w:tbl"):
+            return True
+        parent = parent.getparent()
+    return False
+
+
 def _has_picture(elem):
     return (
         elem.find(qn("w:drawing")) is not None
@@ -780,7 +830,7 @@ def close_unclosed_fields(doc) -> None:
 
 def rewrite_docx(file_bytes: bytes, system_prompt: str) -> bytes:
     doc = Document(io.BytesIO(file_bytes))
-    original = list(doc.paragraphs)
+    original = list(iter_paragraphs(doc))
 
     # Everything from a "References"/"Bibliography" heading onward is left
     # exactly as the author wrote it. Reference entries are not prose: journal
@@ -817,8 +867,15 @@ def rewrite_docx(file_bytes: bytes, system_prompt: str) -> bytes:
     consumed = set()
     title_end = _title_page_end(doc) or 0
     for text, i, info, records in raw:
+        # A sentence continued across two body paragraphs is worth rejoining;
+        # two table cells that merely start lowercase are not the same sentence,
+        # so never merge when either side sits in a table.
+        mergeable = not _in_table(original[i]) and (
+            not merged or not _in_table(original[merged[-1][1]])
+        )
         if (
             merged
+            and mergeable
             and i >= title_end
             and merged[-1][1] >= title_end
             and not re.search(r"[.!?]\s*$", merged[-1][0])
