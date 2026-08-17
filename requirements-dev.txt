@@ -1,0 +1,13 @@
+# Development and CI dependencies.
+#
+#   pip install -r requirements-dev.txt
+#
+# The test suite stubs llm.ask, so it needs no API keys and consumes no quota:
+#
+#   pytest tests/
+#   python tests/test_voice_gate.py   # same suite, no pytest required
+
+-r requirements.txt
+
+pytest>=8.0,<10.0
+httpx>=0.27,<1.0          # fastapi TestClient

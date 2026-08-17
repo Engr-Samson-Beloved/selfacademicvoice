@@ -139,7 +139,10 @@ async def _run_job(job_id: str):
                 job["status"] = "error"
                 job["error"] = _friendly_error(e)
                 return
-            time.sleep(backoffs[attempt])
+            # Must be awaited, not slept: this runs on the event loop, so a
+            # blocking sleep here freezes every other request - including the
+            # status-polling endpoint and /health - for the full backoff.
+            await asyncio.sleep(backoffs[attempt])
 
     job["status"] = "error"
     job["error"] = (

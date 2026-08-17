@@ -1,9 +1,23 @@
-fastapi>=0.115.0
-uvicorn>=0.34.0
-pydantic>=2.0.0
-groq>=0.18.0
-google-genai>=1.0.0
-python-dotenv>=1.0.0
-python-docx>=1.1.0
-python-multipart>=0.0.9
-pypdf>=3.0.0
+# Runtime dependencies for the API and the rewrite engine.
+# Upper bounds are deliberate: an unpinned major bump has broken this build before.
+#
+#   pip install -r requirements.txt
+#
+# The RAG/embedding extras are NOT here on purpose - see requirements-rag.txt.
+# They pull torch (~2GB) and are only needed to build the vector DB.
+
+fastapi>=0.115.0,<1.0
+uvicorn[standard]>=0.34.0,<1.0
+pydantic>=2.0.0,<3.0
+python-multipart>=0.0.9,<1.0
+
+# LLM providers
+google-genai>=1.0.0,<2.0
+groq>=0.18.0,<1.0
+
+# Document parsing / generation
+python-docx>=1.1.0,<2.0
+pypdf>=3.0.0,<7.0
+
+# Config
+python-dotenv>=1.0.0,<2.0

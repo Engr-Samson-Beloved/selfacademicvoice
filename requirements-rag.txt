@@ -1,0 +1,15 @@
+# Optional: RAG retrieval and corpus embedding.
+#
+#   pip install -r requirements.txt -r requirements-rag.txt
+#
+# Needed only by ghostwriter/rag.py and scripts/embed.py, i.e. to build or query
+# data/vector_db/. sentence-transformers pulls torch, which is roughly 2GB - keep
+# it out of the API image unless you are actually serving retrieval.
+#
+# The rewrite pipeline does NOT use these. /health degrades gracefully when they
+# are absent and simply reports documents_in_db: 0.
+
+-r requirements.txt
+
+chromadb>=0.5.0,<2.0
+sentence-transformers>=3.0.0,<6.0

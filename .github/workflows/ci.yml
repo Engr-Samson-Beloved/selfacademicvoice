@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Check the package builds
+        run: |
+          pip install build
+          python -m build --wheel
+
+      - name: Run tests
+        # No API keys are needed: the suite stubs llm.ask.
+        run: pytest tests/ -v
+
+      - name: Verify the voice profile is in sync with its prompt
+        # style_prompt.txt and voice_profile.json are generated. If someone edits
+        # the prompt by hand it will silently disagree with the gate's thresholds.
+        run: |
+          python -c "
+          from pathlib import Path
+          from ghostwriter import voiceprofile
+          p = voiceprofile.load_json(Path('data/voice_profile.json'))
+          prompt = Path('data/style_prompt.txt').read_text(encoding='utf8')
+          assert f'Median sentence: {p.median_len:.0f} words' in prompt, \
+              'style_prompt.txt disagrees with voice_profile.json - regenerate both'
+          print(f'in sync: median={p.median_len}, p90 len={p.len_p90}, p90 commas={p.commas_p90}')
+          "
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: selfacademicvoice:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Boot the container and check /health
+        run: |
+          docker run -d --name api -p 8000:8000 \
+            -e GEMINI_API_SECRET=dummy selfacademicvoice:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health; then
+              echo "healthy"; docker rm -f api; exit 0
+            fi
+            sleep 2
+          done
+          echo "health check never passed"; docker logs api; docker rm -f api; exit 1

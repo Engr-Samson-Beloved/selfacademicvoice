@@ -1,0 +1,35 @@
+# VCS / tooling
+.git
+.github
+.gitignore
+*.md
+!README.md
+
+# Secrets - never bake these into an image
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+venv/
+.venv/
+
+# Local data: corpora, vector DB and rewritten output are runtime state, not
+# build inputs. The two generated voice files ARE needed, so exclude the
+# directory's contents (data/*) rather than the directory itself - Docker cannot
+# re-include a path whose parent directory was excluded.
+data/*
+!data/style_prompt.txt
+!data/voice_profile.json
+
+myvoice/
+tests/
+*.pdf
+*.docx
+*.Zone.Identifier

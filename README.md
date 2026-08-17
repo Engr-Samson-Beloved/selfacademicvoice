@@ -19,17 +19,26 @@ AI ghostwriting assistant that rewrites documents in a specific author's voice. 
 
 ```bash
 python -m venv venv
-source venv/bin/activate
+source venv/bin/activate            # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Create a `.env` file:
+Optional extras:
 
+```bash
+pip install -r requirements-rag.txt   # RAG/embeddings (pulls torch, ~2GB)
+pip install -r requirements-dev.txt   # tests
 ```
-GEMINI_API_KEY=your_gemini_key
-GROQ_API_KEY=your_groq_key
-GHOSTWRITER_CHUNK_SIZE=40
+
+Then create your `.env`:
+
+```bash
+cp .env.example .env
 ```
+
+> The Gemini key must be set as **`GEMINI_API_SECRET`** (or `GEMINI_API_KEY2`).
+> `llm.py` does not read `GEMINI_API_KEY`, so a key set under that name is
+> silently ignored and every request fails with "No GEMINI_API_KEY set".
 
 The style prompt lives in `data/style_prompt.txt` and the RAG vector DB in `data/vector_db/`. If the DB is missing, build it from `data/dataset/`:
 
@@ -203,4 +212,65 @@ source PDF itself is not distributed with this repository.
 
 ## Deployment
 
-Containerized deployment (Docker / Railway) docs coming soon. Note `data/vector_db` and `data/dataset/` are gitignored — rebuild or restore them on the server.
+### Docker
+
+```bash
+cp .env.example .env        # then fill in GEMINI_API_SECRET
+docker compose up --build
+```
+
+Or without compose:
+
+```bash
+docker build -t selfacademicvoice .
+docker run -p 8000:8000 --env-file .env selfacademicvoice
+```
+
+The image is a two-stage build on `python:3.12-slim`, runs as a non-root user
+(uid 10001), and carries a `HEALTHCHECK` against `/health`. The generated
+`data/style_prompt.txt` and `data/voice_profile.json` are baked in; everything
+else under `data/` is runtime state and is excluded from the build context.
+
+### Run exactly one worker
+
+**Job state is an in-process dictionary** (`_jobs` in `api/main.py`). `POST /rewrite`
+returns a `job_id` that the client then polls. With more than one worker or replica,
+the submit and the poll can land on different processes, and the poll returns `404`
+for a job that is running perfectly well.
+
+So: no `--workers 2`, no `deploy.replicas`, no horizontal autoscaling, until job
+state moves to Redis or a database. Scale vertically with `GHOSTWRITER_MAX_WORKERS`
+(threads inside the one process) instead. The `Dockerfile` and `docker-compose.yml`
+both pin a single worker deliberately.
+
+### Other constraints
+
+- **Jobs are lost on restart.** `_jobs` is memory-only with a 30-minute TTL, and
+  it holds uploaded file bytes plus results for that whole window. A deploy
+  mid-rewrite loses in-flight work.
+- **Every submission is written to `data/rewritten/`** and nothing prunes it.
+  Mount a volume if you want the files, and add a cleanup job either way.
+- **CORS is `allow_origins=["*"]` with no authentication on any endpoint.** Put
+  this behind a gateway or add auth before exposing it publicly.
+- **Long documents versus proxy timeouts.** A single request must finish inside
+  your proxy's limit (Cloudflare ~100s). The job API exists precisely so the
+  HTTP request returns immediately; keep clients on the polling flow.
+- `data/vector_db/` and `data/dataset/` are gitignored — rebuild with
+  `python scripts/embed.py` (needs `requirements-rag.txt`) or restore them on the
+  server. The rewrite pipeline does not use them; only `/health` reports on them.
+
+### Platform notes
+
+`pxxl.toml` targets Python 3.12 with `python -m api.main`, which honours `PORT`.
+For Railway, Render or Fly, either use the `Dockerfile` or set the start command to:
+
+```bash
+uvicorn api.main:app --host 0.0.0.0 --port $PORT --workers 1
+```
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs the test suite, builds the wheel, boots the Docker
+image and waits for `/health`, and asserts that `data/style_prompt.txt` and
+`data/voice_profile.json` are still in sync — the two are generated together and a
+hand-edit to the prompt would otherwise silently disagree with the gate's thresholds.

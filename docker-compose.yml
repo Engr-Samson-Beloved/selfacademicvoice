@@ -1,0 +1,23 @@
+services:
+  api:
+    build: .
+    image: selfacademicvoice:latest
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      PORT: 8000
+    volumes:
+      # Rewritten documents survive a container restart. Remove this if you do
+      # not want submitted or rewritten documents persisted on the host.
+      - ./data/rewritten:/app/data/rewritten
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # Do not add `deploy.replicas` or extra uvicorn workers: job state is
+    # in-process, so a poll routed to a different replica 404s. See Dockerfile.
