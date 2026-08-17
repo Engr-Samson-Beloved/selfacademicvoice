@@ -87,7 +87,24 @@ def _is_server_error(e: Exception) -> bool:
 
 
 def _is_fallback_error(e: Exception) -> bool:
-    return _is_model_unavailable(e) or _is_server_error(e)
+    """Errors that should hand the request to the fallback provider.
+
+    Quota exhaustion belongs here and was missing: the README advertises
+    "automatic fallback to Groq when the Gemini quota is exhausted", but 429 /
+    RESOURCE_EXHAUSTED was not in this set, so a quota-exhausted job failed
+    outright even with GROQ_API_KEY configured. _is_quota_error existed for this
+    and was never called.
+
+    By the time an exception reaches here the per-model and per-key rotation in
+    _ask_gemini has already been exhausted, including the sleep-and-retry for
+    per-minute limits, so there is nothing left to wait for on Gemini's side.
+    """
+    return (
+        _is_model_unavailable(e)
+        or _is_server_error(e)
+        or _is_quota_error(e)
+        or _is_overloaded(e)
+    )
 
 
 def _groq_available() -> bool:
@@ -256,6 +273,13 @@ def ask(prompt: str, system_prompt: str = None, temperature: float = 0.4) -> str
                     raise RuntimeError(
                         f"Gemini API unavailable and Groq fallback failed: {groq_err}"
                     ) from e
+            if _is_quota_error(e):
+                raise RuntimeError(
+                    "Gemini quota exhausted and no GROQ_API_KEY is set for automatic "
+                    "fallback. Free-tier keys allow only a small number of requests "
+                    "per day per model; either wait for the quota to reset, enable "
+                    "billing on the Google project, or set GROQ_API_KEY."
+                ) from e
             raise RuntimeError(
                 "Gemini API unavailable and no GROQ_API_KEY is set for automatic fallback."
             ) from e
