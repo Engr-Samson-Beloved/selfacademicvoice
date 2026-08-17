@@ -23,12 +23,16 @@ ENV PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
     PORT=8000
 
-# curl is only for the container HEALTHCHECK below.
-RUN apt-get update \
- && apt-get install -y --no-install-recommends curl \
- && rm -rf /var/lib/apt/lists/*
-
-RUN useradd --create-home --uid 10001 ghostwriter
+# No apt-get here on purpose. The healthcheck below uses the Python that is
+# already in the image rather than installing curl, which keeps the image
+# smaller and lets this file build on non-Debian bases and on PaaS builders
+# that replay RUN lines outside a real Docker context (pxxl does this, and has
+# no apt-get).
+#
+# useradd is Debian; adduser is the busybox/Alpine equivalent. Try both so the
+# build does not hard-fail on a base we did not anticipate.
+RUN useradd --create-home --uid 10001 ghostwriter \
+ || adduser -D -u 10001 ghostwriter
 
 COPY --from=builder /opt/venv /opt/venv
 
@@ -47,7 +51,7 @@ USER ghostwriter
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -fsS "http://localhost:${PORT}/health" || exit 1
+    CMD python -c "import os,sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','8000')+'/health', timeout=4).status==200 else 1)"
 
 # IMPORTANT: a single worker, deliberately.
 #
