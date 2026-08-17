@@ -20,6 +20,7 @@
   ],
   "commas_per_sentence": 1.5555555555555556,
   "commas_p90": 4,
+  "label_colon_rate": 0.012345679012345678,
   "len_p90": 55,
   "semicolons": 1,
   "dashes": 2,

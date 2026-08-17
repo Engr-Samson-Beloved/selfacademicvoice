@@ -180,6 +180,24 @@ _STOP = set(
 )
 
 
+# "Touchless operation: removes the need to..." - a definition-style bullet.
+LABEL_COLON_RE = re.compile(r"^\s*[•\-\*]?\s*([A-Z][A-Za-z][^.:;!?]{2,45}):\s+\S")
+# A label is a short noun phrase. Without this cap, ordinary lead-ins such as
+# "The specific problem can be stated as follows:" match too.
+MAX_LABEL_WORDS = 5
+
+
+def label_prefix(sentence: str) -> str | None:
+    """The "Label" of a "Label: explanation" bullet, or None."""
+    m = LABEL_COLON_RE.match(sentence)
+    if not m:
+        return None
+    label = m.group(1).strip()
+    if len(label.split()) > MAX_LABEL_WORDS:
+        return None
+    return label
+
+
 def _percentile(values: list[int], pct: int) -> int:
     """Nearest-rank percentile. Used for per-sentence ceilings, so it must be an
     observed value rather than an interpolated one the author never wrote."""
@@ -203,6 +221,8 @@ class Profile:
     length_deciles: list[int] = field(default_factory=list)
     commas_per_sentence: float = 0.0
     commas_p90: int = 0
+    # Fraction of prose sentences shaped as "Short Label: explanation".
+    label_colon_rate: float = 0.0
     len_p90: int = 0
     semicolons: int = 0
     dashes: int = 0
@@ -374,6 +394,7 @@ def measure(raw: str) -> Profile:
         length_deciles=[round(x) for x in st.quantiles(lens, n=10)],
         commas_per_sentence=sum(s.count(",") for s in sents) / n,
         commas_p90=_percentile([s.count(",") for s in sents], 90),
+        label_colon_rate=sum(1 for s in sents if label_prefix(s)) / n,
         len_p90=_percentile(lens, 90),
         semicolons=text.count(";"),
         dashes=len(re.findall(r"[–—]", text)),
@@ -665,6 +686,17 @@ def sentence_violations(profile: Profile, rewritten: str, original: str) -> list
         problems.append(
             f"you dropped content - this must say everything the original said. "
             f"Expand back to roughly {orig_words} words (currently {words})"
+        )
+
+    # A "Label: explanation" bullet is a construction the author may simply never
+    # use. When the corpus rate is ~0, carrying one through from the source keeps
+    # the label byte-identical AND off-voice at the same time.
+    label = label_prefix(rewritten)
+    if profile.label_colon_rate < 0.02 and label:
+        problems.append(
+            f'the author never writes "Label: explanation" bullets - fold '
+            f'"{label}" into a flowing sentence instead of leaving it as a '
+            f"heading followed by a colon"
         )
 
     run, run_text = _longest_shared_run(rewritten, original)

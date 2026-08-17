@@ -96,6 +96,32 @@ def test_genuine_rewrite_has_no_long_verbatim_run():
                    for p in voiceprofile.sentence_violations(PROFILE, good, orig))
 
 
+def test_label_colon_bullet_flagged():
+    """The corpus contains no "Label: explanation" bullets in prose, but the
+    rewrite prompt used to mandate keeping such labels verbatim - leaving them
+    simultaneously unrewritten and off-voice."""
+    for s in ("Touchless operation: removes the need to touch common surfaces.",
+              "• Sensitivity to lighting conditions: accuracy degrades in poor light.",
+              "Extensibility: the same pipeline can be repurposed for other applications."):
+        problems = voiceprofile.sentence_violations(PROFILE, s, s + " padding words here")
+        assert any("Label: explanation" in p for p in problems), s
+
+
+def test_ordinary_colon_lead_in_not_flagged():
+    """A clause ending in a colon is not a label; only short noun phrases are."""
+    for s in ("The specific problem can be stated as follows: design and evaluate a system.",
+              "The study shows that majority of users visit public libraries regularly."):
+        problems = voiceprofile.sentence_violations(PROFILE, s, s + " padding words here")
+        assert not any("Label: explanation" in p for p in problems), s
+
+
+def test_label_prefix_extraction():
+    assert voiceprofile.label_prefix("Touchless operation: removes the need") == "Touchless operation"
+    assert voiceprofile.label_prefix("• Extensibility: the pipeline adapts") == "Extensibility"
+    assert voiceprofile.label_prefix("The specific problem can be stated as follows: design it") is None
+    assert voiceprofile.label_prefix("Public libraries provide information resources.") is None
+
+
 def test_clean_sentence_passes():
     orig = "Education solely depends on the availability of information."
     good = "Education depends only on having the right information at the right time."
