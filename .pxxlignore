@@ -1,0 +1,38 @@
+# Files excluded from the Pxxl deploy archive (gitignore syntax).
+#
+# Pxxl builds with the Gateway *buildpack* pipeline and has no Dockerfile
+# builder. When the Dockerfile is present it gets flattened into a build script
+# and its RUN lines are replayed outside a real Docker context, which fails:
+#
+#     /pxxl-input/build.sh: 9: apt-get: not found
+#
+# The Dockerfile is still correct for real Docker builds (compose, Railway,
+# Render, Fly) and is verified by CI. It just must not reach Pxxl.
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# CI config and tests are not needed at runtime.
+.github/
+tests/
+
+# Author corpus: source PDFs are not distributed or deployed. The *generated*
+# data/style_prompt.txt and data/voice_profile.json ARE required at runtime and
+# are deliberately not ignored here.
+myvoice/
+*.pdf
+*.docx
+
+# Runtime state, rebuilt or written on the server.
+data/rewritten/
+data/vector_db/
+data/dataset/
+data/input/
+
+# Local Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/

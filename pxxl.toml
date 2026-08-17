@@ -1,5 +1,32 @@
+# Pxxl build configuration (Gateway buildpack pipeline).
+#
+# Fields follow the documented [build] schema:
+#   https://docs.pxxl.app/api/pxxl-toml.md
+#
+# Pxxl has no Dockerfile builder, so the Dockerfile is excluded via .pxxlignore
+# and this buildpack config is what Pxxl uses. For real Docker platforms
+# (compose, Railway, Render, Fly) use the Dockerfile instead.
+
+[build]
 language = "python"
 framework = "fastapi"
 pythonVersion = "3.12"
+installCommand = "pip install -r requirements.txt"
+# api/main.py reads PORT from the environment, so no shell expansion is needed
+# here. Note this runs a single process on purpose: job state is an in-process
+# dict, so a second worker would 404 polls for jobs that are running fine.
 startCommand = "python -m api.main"
 port = 8000
+
+# Non-secret defaults only. Secrets - GEMINI_API_SECRET, GEMINI_API_KEY2,
+# GROQ_API_KEY - must be set as Pxxl environment secrets, never committed here.
+[env]
+GHOSTWRITER_PROVIDER = "gemini"
+GEMINI_MODEL = "gemini-3.7-flash"
+GHOSTWRITER_CHUNK_SIZE = "8"
+GHOSTWRITER_MAX_WORKERS = "4"
+GHOSTWRITER_TEMPERATURE = "0.8"
+GHOSTWRITER_KEEP_RATIO = "0"
+GHOSTWRITER_VOICE_PROFILE = "data/voice_profile.json"
+GHOSTWRITER_VOICE_GATE = "1"
+GHOSTWRITER_VOICE_GATE_ATTEMPTS = "2"

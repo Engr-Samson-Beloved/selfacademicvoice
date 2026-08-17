@@ -261,12 +261,28 @@ both pin a single worker deliberately.
 
 ### Platform notes
 
-`pxxl.toml` targets Python 3.12 with `python -m api.main`, which honours `PORT`.
-For Railway, Render or Fly, either use the `Dockerfile` or set the start command to:
+**Pxxl** builds with the Gateway *buildpack* pipeline and has **no Dockerfile
+builder**. If a `Dockerfile` is present it gets flattened into a build script and
+its `RUN` lines are replayed outside a real Docker context, which fails on
+anything Docker-specific:
+
+```
+/pxxl-input/build.sh: 9: apt-get: not found
+```
+
+So `.pxxlignore` excludes `Dockerfile`, `.dockerignore` and `docker-compose.yml`,
+and `pxxl.toml` carries the buildpack config instead (`[build]` schema, Python
+3.12, `python -m api.main`, port 8000). Set `GEMINI_API_SECRET` and any other
+secrets as Pxxl environment secrets — never in `pxxl.toml`.
+
+**Railway, Render, Fly, or plain `docker compose`** do real Docker builds, so use
+the `Dockerfile` there. Alternatively set the start command to:
 
 ```bash
 uvicorn api.main:app --host 0.0.0.0 --port $PORT --workers 1
 ```
+
+Either way, keep it to one worker — see above.
 
 ## Continuous integration
 
