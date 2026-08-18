@@ -145,7 +145,13 @@ def _gemini_generate(api_key: str, model: str, prompt: str, system_prompt: str, 
             temperature=temperature,
         ),
     )
-    return response.text.strip()
+    text = (response.text or "").strip()
+    if not text:
+        # Same failure mode as Groq: an empty completion parses to zero
+        # sentences and silently restores the source text for the whole chunk,
+        # so it must raise and let the retry/rotation handle it.
+        raise RuntimeError(f"{model} returned an empty completion")
+    return text
 
 
 # Floor on the time any one model gets, so a slow first model cannot leave the
@@ -299,12 +305,30 @@ def _ask_groq(prompt: str, system_prompt: str, temperature: float) -> str:
     last_err = None
     for attempt in range(3):
         try:
-            response = _get_groq_client().chat.completions.create(
-                model=config.LLM_MODEL,
-                messages=messages,
-                temperature=temperature,
-            )
-            return response.choices[0].message.content.strip()
+            kwargs = {
+                "model": config.LLM_MODEL,
+                "messages": messages,
+                "temperature": temperature,
+                # Reasoning models spend the completion budget thinking and can
+                # return empty content otherwise. Observed with gpt-oss-120b at
+                # 16 sentences: 0 characters back, so every sentence in the chunk
+                # silently fell back to the original text.
+                "max_completion_tokens": config.GROQ_MAX_TOKENS,
+            }
+            if config.GROQ_REASONING_EFFORT:
+                kwargs["reasoning_effort"] = config.GROQ_REASONING_EFFORT
+            response = _get_groq_client().chat.completions.create(**kwargs)
+            content = (response.choices[0].message.content or "").strip()
+            if not content:
+                # An empty completion is a failure, not an answer. Returning ""
+                # here parses to zero sentences and silently restores the
+                # source text for the whole chunk.
+                raise RuntimeError(
+                    f"{config.LLM_MODEL} returned an empty completion "
+                    f"(finish_reason={getattr(response.choices[0], 'finish_reason', '?')}); "
+                    "lower GHOSTWRITER_CHUNK_SIZE or raise GROQ_MAX_TOKENS"
+                )
+            return content
         except Exception as e:
             last_err = e
             msg = str(e)
