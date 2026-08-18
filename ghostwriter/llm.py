@@ -1,9 +1,16 @@
+import logging
 import os
 import re
 import threading
 import time
 
 from . import config
+
+log = logging.getLogger(__name__)
+
+# Ceiling on how long to honour a provider's retry-after. Token-per-minute
+# limits routinely ask for 20-30s, which the previous 10s cap could never satisfy.
+MAX_RATE_LIMIT_WAIT = 60.0
 
 _groq_client = None
 _gemini_clients: dict[str, object] = {}
@@ -302,8 +309,13 @@ def _ask_groq(prompt: str, system_prompt: str, temperature: float) -> str:
             last_err = e
             msg = str(e)
             if "429" in msg or "RATE_LIMIT" in msg or "rate limit" in msg.lower():
-                delay = min(_retry_delay(msg), 10.0)
-                if attempt < 2 and delay <= 10.0:
+                # Honour the server's own retry-after. Capping it at 10s meant a
+                # provider asking for 21.5s was retried at 10s and failed again
+                # every time - the cap guaranteed the retry could not succeed.
+                # The small buffer avoids landing exactly on the boundary.
+                delay = min(_retry_delay(msg) + 1.0, MAX_RATE_LIMIT_WAIT)
+                if attempt < 2 and delay > 0:
+                    log.info("rate limited by %s; waiting %.0fs", config.LLM_MODEL, delay)
                     time.sleep(delay)
                     continue
             raise
