@@ -49,19 +49,22 @@ Put genuinely short sentences next to long ones.
 
 Per 1000 words the author writes: "of" 70, "the" 55, "and" 42, "in" 22, "to" 19, "is" 15
 
-"of" appears about 70 times per 1000 words and "the" about
-55. That is high, and it is not decoration: this author builds
-long possessive chains with definite articles rather than compact
-compound nouns.
+These are TARGETS, not floors. Aim for "of" near 70 per 1000 words
+and "the" near 55 — going well above them misses this author just
+as badly as going below.
+
+The author builds possessive chains with definite articles rather than
+compact compound nouns:
 
   AUTHOR : "the overall information resources in various areas of knowledge"
   AUTHOR : "the degree of access to knowledge and the level of well-being"
-  NOT    : "knowledge area information resources"
-  NOT    : "knowledge access degree"
+  NOT    : "knowledge area information resources"   (over-compressed)
+  NOT    : "the level of the degree of the access of the knowledge"  (padded)
 
-Prefer "the X of the Y" over "Y X". Compressing noun phrases into
-compounds is the single most common way a rewrite stops sounding like
-this author, and it survives every other check.
+Use "the X of the Y" where it reads naturally. Do NOT insert "of" and
+"the" mechanically to hit a number: padded chains read worse than
+compounds. Sentence length should stay near 25 words — if your
+sentences are drifting past 35 words, you are padding.
 
 ======================================================================
 ## CITATION HABITS

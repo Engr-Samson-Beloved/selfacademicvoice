@@ -508,19 +508,22 @@ def render(p: Profile) -> str:
             "Per 1000 words the author writes: "
             + ", ".join(f'"{w}" {r:.0f}' for w, r in top),
             "",
-            f'"of" appears about {of_rate:.0f} times per 1000 words and "the" about',
-            f"{the_rate:.0f}. That is high, and it is not decoration: this author builds",
-            "long possessive chains with definite articles rather than compact",
-            "compound nouns.",
+            f'These are TARGETS, not floors. Aim for "of" near {of_rate:.0f} per 1000 words',
+            f'and "the" near {the_rate:.0f} — going well above them misses this author just',
+            "as badly as going below.",
+            "",
+            "The author builds possessive chains with definite articles rather than",
+            "compact compound nouns:",
             "",
             "  AUTHOR : \"the overall information resources in various areas of knowledge\"",
             "  AUTHOR : \"the degree of access to knowledge and the level of well-being\"",
-            "  NOT    : \"knowledge area information resources\"",
-            "  NOT    : \"knowledge access degree\"",
+            "  NOT    : \"knowledge area information resources\"   (over-compressed)",
+            "  NOT    : \"the level of the degree of the access of the knowledge\"  (padded)",
             "",
-            "Prefer \"the X of the Y\" over \"Y X\". Compressing noun phrases into",
-            "compounds is the single most common way a rewrite stops sounding like",
-            "this author, and it survives every other check.",
+            "Use \"the X of the Y\" where it reads naturally. Do NOT insert \"of\" and",
+            "\"the\" mechanically to hit a number: padded chains read worse than",
+            f"compounds. Sentence length should stay near {p.median_len:.0f} words — if your",
+            "sentences are drifting past 35 words, you are padding.",
         ]
 
     lines += ["", "=" * 70, "## CITATION HABITS", "=" * 70, ""]
@@ -826,12 +829,16 @@ def compare(profile: Profile, candidate: str) -> list[tuple[str, str, str, bool]
     # because noun-phrase compression shows up there first.
     if profile.function_rates:
         cand = function_rates(text)
-        for word in ("of", "the"):
+        for word in ("of", "the", "and"):
             want = profile.function_rates.get(word, 0.0)
             got = cand.get(word, 0.0)
             if want:
+                # Two-sided. A one-sided version of this check reported "of"
+                # fixed while "the" ran at twice the author's rate, unseen -
+                # over-correcting a voice trait misses the author as surely as
+                # under-correcting it.
                 row(f'"{word}" per 1000 words', want, got,
-                    got >= want * 0.6, "{:.0f}")
+                    want * 0.6 <= got <= want * 1.4, "{:.0f}")
 
     banned = [c for c in ("Hence", "Moreover", "However", "Consequently")
               if not any(c == k for k, _ in profile.connectors)]
