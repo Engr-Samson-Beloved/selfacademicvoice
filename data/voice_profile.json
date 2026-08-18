@@ -21,6 +21,45 @@
   "commas_per_sentence": 1.5555555555555556,
   "commas_p90": 4,
   "label_colon_rate": 0.012345679012345678,
+  "function_rates": {
+    "of": 69.95033112582782,
+    "the": 54.63576158940398,
+    "and": 41.8046357615894,
+    "to": 18.625827814569536,
+    "in": 22.350993377483444,
+    "a": 10.76158940397351,
+    "is": 14.900662251655628,
+    "are": 13.658940397350994,
+    "that": 10.347682119205299,
+    "for": 8.278145695364238,
+    "with": 6.208609271523179,
+    "as": 8.278145695364238,
+    "or": 1.6556291390728477,
+    "by": 7.0364238410596025,
+    "this": 4.139072847682119,
+    "it": 4.966887417218543,
+    "be": 3.3112582781456954,
+    "from": 4.552980132450331,
+    "when": 0.8278145695364238,
+    "which": 3.725165562913907,
+    "their": 5.7947019867549665,
+    "there": 2.4834437086092715,
+    "was": 3.3112582781456954,
+    "were": 1.6556291390728477,
+    "an": 3.3112582781456954,
+    "on": 5.380794701986755,
+    "not": 2.0695364238410594,
+    "but": 1.6556291390728477,
+    "all": 1.2417218543046358,
+    "any": 0.0,
+    "more": 1.6556291390728477,
+    "most": 1.2417218543046358,
+    "have": 2.0695364238410594,
+    "has": 2.0695364238410594,
+    "can": 0.8278145695364238,
+    "will": 0.4139072847682119,
+    "would": 0.0
+  },
   "len_p90": 55,
   "semicolons": 1,
   "dashes": 2,
@@ -153,12 +192,32 @@
   ],
   "structural_phrases": [
     [
+      "are of the view that",
+      4
+    ],
+    [
       "members of the community",
       3
     ],
     [
-      "source of reading",
+      "as tools for",
       3
+    ],
+    [
+      "the level of",
+      3
+    ],
+    [
+      "above shows that",
+      3
+    ],
+    [
+      "the study shows that majority of",
+      2
+    ],
+    [
+      "are between the ages of",
+      2
     ],
     [
       "adopted for the study",
@@ -169,38 +228,42 @@
       2
     ],
     [
-      "study shows that majority",
-      2
-    ],
-    [
-      "filled and returned",
-      2
-    ],
-    [
-      "established in year",
-      2
-    ],
-    [
-      "department of language",
-      2
-    ],
-    [
-      "between the ages",
-      2
-    ],
-    [
-      "non regd user",
+      "source of reading while",
       2
     ]
   ],
   "domain_terms": [
     [
-      "non registered users",
+      "of none registered users and",
+      7
+    ],
+    [
+      "public libraries are",
       6
+    ],
+    [
+      "of registered users and",
+      5
+    ],
+    [
+      "of freely abled users are of",
+      4
+    ],
+    [
+      "freely abled users are of the",
+      4
     ],
     [
       "abled users are of the view",
       4
+    ],
+    [
+      "users are of the view that",
+      4
+    ],
+    [
+      "as tools for socio-economic and political",
+      3
     ],
     [
       "tools for socio-economic and political development",
@@ -209,30 +272,6 @@
     [
       "selected public libraries in kota region",
       3
-    ],
-    [
-      "public libraries in kota region rajasthan",
-      3
-    ],
-    [
-      "libraries in kota region of rajasthan",
-      3
-    ],
-    [
-      "knowledge and information",
-      3
-    ],
-    [
-      "public libraries as tools for socio-economic",
-      2
-    ],
-    [
-      "raja ram mohun roy library foundation",
-      2
-    ],
-    [
-      "users of public libraries in kota",
-      2
     ]
   ],
   "topic_words": [

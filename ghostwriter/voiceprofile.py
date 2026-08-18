@@ -198,6 +198,21 @@ def label_prefix(sentence: str) -> str | None:
     return label
 
 
+FUNCTION_WORDS = (
+    "of the and to in a is are that for with as or by this it be from when which "
+    "their there was were an on not but all any more most have has can will would"
+).split()
+
+
+def function_rates(text: str) -> dict[str, float]:
+    """Occurrences per 1000 tokens for FUNCTION_WORDS."""
+    toks = re.findall(r"[a-z][a-z'\-]*", text.lower())
+    if not toks:
+        return {}
+    counts = Counter(toks)
+    return {w: 1000 * counts[w] / len(toks) for w in FUNCTION_WORDS}
+
+
 def _percentile(values: list[int], pct: int) -> int:
     """Nearest-rank percentile. Used for per-sentence ceilings, so it must be an
     observed value rather than an interpolated one the author never wrote."""
@@ -223,6 +238,10 @@ class Profile:
     commas_p90: int = 0
     # Fraction of prose sentences shaped as "Short Label: explanation".
     label_colon_rate: float = 0.0
+    # Occurrences per 1000 tokens for a fixed set of function words. Topic nouns
+    # must differ between documents; these should not, which is why authorship
+    # attribution leans on them.
+    function_rates: dict[str, float] = field(default_factory=dict)
     len_p90: int = 0
     semicolons: int = 0
     dashes: int = 0
@@ -282,10 +301,12 @@ def _collocations(sents: list[str], topic: set[str], proper: set[str]) -> tuple[
         if count < 2:
             continue
         parts = gram.split()
-        # A fragment that begins or ends on a function word is a sliding-window
-        # artifact, not a construction the author reuses.
-        if parts[0] in _STOP or parts[-1] in _STOP:
-            continue
+        # Boundary function words are allowed. Rejecting them (as an earlier
+        # fragment guard did) discarded precisely the constructions that carry
+        # a voice across topics - "are of the view that", "depends largely
+        # upon", "regardless of" all begin or end on a stopword. Masking numbers
+        # above already removes the sliding-window fragments that guard existed
+        # for. A phrase must still carry at least one content word.
         if not any(p not in _STOP for p in parts):
             continue
         # Names and topic nouns are not transferable to another subject.
@@ -395,6 +416,7 @@ def measure(raw: str) -> Profile:
         commas_per_sentence=sum(s.count(",") for s in sents) / n,
         commas_p90=_percentile([s.count(",") for s in sents], 90),
         label_colon_rate=sum(1 for s in sents if label_prefix(s)) / n,
+        function_rates=function_rates(text),
         len_p90=_percentile(lens, 90),
         semicolons=text.count(";"),
         dashes=len(re.findall(r"[–—]", text)),
@@ -471,6 +493,34 @@ def render(p: Profile) -> str:
         lines += [
             f"- NEVER use: {', '.join(absent)}. These do not appear in the corpus.",
             "  They are the connectives a model reaches for by default; this author does not.",
+        ]
+
+    if p.function_rates:
+        top = sorted(p.function_rates.items(), key=lambda kv: -kv[1])[:6]
+        of_rate = p.function_rates.get("of", 0.0)
+        the_rate = p.function_rates.get("the", 0.0)
+        lines += [
+            "",
+            "=" * 70,
+            "## PHRASE SHAPE — the trait most often missed",
+            "=" * 70,
+            "",
+            "Per 1000 words the author writes: "
+            + ", ".join(f'"{w}" {r:.0f}' for w, r in top),
+            "",
+            f'"of" appears about {of_rate:.0f} times per 1000 words and "the" about',
+            f"{the_rate:.0f}. That is high, and it is not decoration: this author builds",
+            "long possessive chains with definite articles rather than compact",
+            "compound nouns.",
+            "",
+            "  AUTHOR : \"the overall information resources in various areas of knowledge\"",
+            "  AUTHOR : \"the degree of access to knowledge and the level of well-being\"",
+            "  NOT    : \"knowledge area information resources\"",
+            "  NOT    : \"knowledge access degree\"",
+            "",
+            "Prefer \"the X of the Y\" over \"Y X\". Compressing noun phrases into",
+            "compounds is the single most common way a rewrite stops sounding like",
+            "this author, and it survives every other check.",
         ]
 
     lines += ["", "=" * 70, "## CITATION HABITS", "=" * 70, ""]
@@ -770,6 +820,18 @@ def compare(profile: Profile, candidate: str) -> list[tuple[str, str, str, bool]
         found = len(re.findall(pattern, text))
         scaled = allowed * max(1, n / max(1, profile.n_sentences))
         row(label, allowed, found, found <= max(scaled, allowed), "{:.0f}")
+
+    # Function-word density: the strongest authorship signal, and the one that
+    # survives a rewrite that is otherwise faithful. Reported for "of" and "the"
+    # because noun-phrase compression shows up there first.
+    if profile.function_rates:
+        cand = function_rates(text)
+        for word in ("of", "the"):
+            want = profile.function_rates.get(word, 0.0)
+            got = cand.get(word, 0.0)
+            if want:
+                row(f'"{word}" per 1000 words', want, got,
+                    got >= want * 0.6, "{:.0f}")
 
     banned = [c for c in ("Hence", "Moreover", "However", "Consequently")
               if not any(c == k for k, _ in profile.connectors)]
