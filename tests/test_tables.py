@@ -139,6 +139,47 @@ def test_short_header_cells_left_alone():
     assert "Stage" in text and "Description" in text, "short headers were altered"
 
 
+def test_terse_data_cells_are_not_paraphrased():
+    """Regression: the first table pass treated every cell as prose and produced
+    "Ultra-High Frequency which is called UHF." and "Tracking of Vehicle and
+    long range." from what were column labels and matrix entries."""
+    d = docx.Document()
+    d.add_paragraph(BODY_PROSE)
+    t = d.add_table(rows=3, cols=2)
+    t.cell(0, 0).text = "Band"
+    t.cell(0, 1).text = "Energy Savings Potential"
+    t.cell(1, 0).text = "Ultra-High Frequency (UHF)"
+    t.cell(1, 1).text = "Access control, animal tagging"
+    t.cell(2, 0).text = "High Frequency (HF)"
+    t.cell(2, 1).text = "Vehicle & long-range tracking"
+    buf = io.BytesIO()
+    d.save(buf)
+
+    out, _ = _run(buf.getvalue())
+    text = _all_text(out)
+    for original in ("Ultra-High Frequency (UHF)", "Energy Savings Potential",
+                     "Access control, animal tagging", "Vehicle & long-range tracking",
+                     "High Frequency (HF)"):
+        assert original in text, f"terse cell was paraphrased: {original!r}"
+
+
+def test_header_row_never_rewritten_even_when_wordy():
+    d = docx.Document()
+    d.add_paragraph(BODY_PROSE)
+    t = d.add_table(rows=2, cols=1)
+    header = ("Comparative assessment of the available automation approaches "
+              "across installation cost and achievable savings")
+    t.cell(0, 0).text = header
+    t.cell(1, 0).text = CELL_PROSE
+    buf = io.BytesIO()
+    d.save(buf)
+
+    out, _ = _run(buf.getvalue())
+    text = _all_text(out)
+    assert header in text, "header row was rewritten"
+    assert CELL_PROSE not in text, "body cell prose should still be rewritten"
+
+
 if __name__ == "__main__":
     tests = [(n, o) for n, o in sorted(globals().items())
              if n.startswith("test_") and callable(o)]

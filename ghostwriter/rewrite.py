@@ -618,6 +618,51 @@ def iter_paragraphs(doc):
             yield from _table_paragraphs(Table(child, doc), doc, seen)
 
 
+# A table cell is usually a label or a datum, not prose. Paraphrasing those
+# damages the table: headers stop matching their columns, "Ultra-High Frequency
+# (UHF)" becomes "Ultra-High Frequency which is called UHF.", and terse matrix
+# entries turn into sentences. Only rewrite a cell that is genuinely prose.
+TABLE_PROSE_MIN_WORDS = 12
+TABLE_PROSE_MIN_WORDS_WITH_STOP = 8
+
+
+def _is_table_prose(text):
+    words = text.split()
+    if len(words) >= TABLE_PROSE_MIN_WORDS:
+        return True
+    # A shorter cell still counts if it is punctuated as a sentence.
+    return (
+        len(words) >= TABLE_PROSE_MIN_WORDS_WITH_STOP
+        and re.search(r"[.!?]\s*$", text.strip()) is not None
+    )
+
+
+def _table_header_paragraphs(doc):
+    """Paragraph ids in the first row of every table, nested ones included.
+
+    Header cells name the columns. Rewriting them silently breaks the table's
+    meaning - "Energy Savings Potential" became "Possible Energy Reduction".
+    """
+    ids = set()
+
+    def walk(tables):
+        for t in tables:
+            rows = t.rows
+            # A single-row table has no header/data distinction - it is usually a
+            # callout or text box, so treating its only row as a header would
+            # exempt the whole thing from rewriting.
+            if len(rows) >= 2:
+                for c in rows[0].cells:
+                    for p in c.paragraphs:
+                        ids.add(id(p._p))
+            for r in rows:
+                for c in r.cells:
+                    walk(c.tables)
+
+    walk(doc.tables)
+    return ids
+
+
 def _in_table(paragraph):
     parent = paragraph._p.getparent()
     while parent is not None:
@@ -867,6 +912,8 @@ def rewrite_docx(file_bytes: bytes, system_prompt: str) -> bytes:
             log.info("references section starts at paragraph %d; left verbatim", i)
             break
 
+    header_ids = _table_header_paragraphs(doc)
+
     raw = []
     cite_counter = [0]
     for i, p in enumerate(original):
@@ -881,6 +928,8 @@ def rewrite_docx(file_bytes: bytes, system_prompt: str) -> bytes:
         if _has_inline_caption(text) or re.search(r"SEQ (?:Figure|Table)", p._p.xml):
             continue
         if _is_heading_paragraph(p):
+            continue
+        if _in_table(p) and (id(p._p) in header_ids or not _is_table_prose(text)):
             continue
         info = _sentence_bold_info(re.sub(r"\n", " ", visible_text), run_spans)
         raw.append((text, i, info, records))
