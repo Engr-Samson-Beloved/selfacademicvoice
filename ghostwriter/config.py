@@ -10,17 +10,7 @@ GROQ_API_KEY = "GROQ_API_KEY"
 GEMINI_API_KEY = "GEMINI_API_KEY"
 GEMINI_API_KEY2 = "GEMINI_API_KEY2"
 GEMINI_API_SECRET = "GEMINI_API_SECRET"
-# Groq retires models without notice: the previously hardcoded
-# "llama-3.3-70b-versatile" now returns 404, which silently broke the documented
-# Groq fallback for anyone who set a key. Overridable, like GEMINI_MODEL.
-LLM_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
-# Completion budget for Groq. Reasoning models consume this while thinking, so
-# without headroom they return empty content and the whole chunk falls back to
-# the source text.
-GROQ_MAX_TOKENS = int(os.environ.get("GROQ_MAX_TOKENS", "8192"))
-# "low" keeps a reasoning model from spending the budget before it writes.
-# Set empty to omit the parameter for models that reject it.
-GROQ_REASONING_EFFORT = os.environ.get("GROQ_REASONING_EFFORT", "low")
+LLM_MODEL = "llama-3.3-70b-versatile"
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.7-flash")
 KEEP_RATIO = float(os.environ.get("GHOSTWRITER_KEEP_RATIO", "0"))
 REWRITE_CHUNK_SIZE = int(os.environ.get("GHOSTWRITER_CHUNK_SIZE", "8"))
