@@ -373,10 +373,21 @@ def _apply_voice_gate(rewrites, original_map, system_prompt):
 
         chunks = [flagged[i:i + CHUNK_SIZE] for i in range(0, len(flagged), CHUNK_SIZE)]
         workers = min(config.REWRITE_MAX_WORKERS, len(chunks)) or 1
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            results = list(
-                executor.map(lambda c: _voice_repair_chunk(c, system_prompt), chunks)
+
+        # This pass only refines an already-complete rewrite, so a provider
+        # failure must not discard it: one ConnectTimeout during pass 2 threw
+        # away 383 seconds of finished work. Keep what we have and stop.
+        try:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                results = list(
+                    executor.map(lambda c: _voice_repair_chunk(c, system_prompt), chunks)
+                )
+        except Exception as e:
+            log.warning(
+                "voice gate pass %d abandoned (%s: %s); keeping the rewrite as it stands",
+                attempt + 1, type(e).__name__, str(e)[:160],
             )
+            return
 
         improved = 0
         for parsed in results:
@@ -510,7 +521,18 @@ Rules:
 - Carry over every point the original makes, but in different words — do not shorten, and do not stay close to the original's phrasing
 - Do not add new ideas or append evaluative clauses
 - Return only the numbered rewritten sentences, nothing else"""
-        result = llm.ask(prompt, system_prompt=system_prompt, temperature=config.REWRITE_TEMPERATURE)
+        # Refinement of an already-complete rewrite: a provider failure here
+        # should cost the retry, not the document.
+        try:
+            result = llm.ask(
+                prompt, system_prompt=system_prompt, temperature=config.REWRITE_TEMPERATURE
+            )
+        except Exception as e:
+            log.warning(
+                "similarity retry %d abandoned (%s: %s); keeping the rewrite as it stands",
+                attempt + 1, type(e).__name__, str(e)[:160],
+            )
+            break
         rewrites.update(_parse_numbered(result))
 
     # Report what the similarity gate could not fix. Previously these fell

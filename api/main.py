@@ -21,6 +21,27 @@ logging.basicConfig(
     format="%(levelname)s:%(name)s:%(message)s",
 )
 
+def _code_version() -> str:
+    """Newest mtime across the engine, so a stale server is visible in the log.
+
+    A running process keeps the modules it imported at startup. Editing files on
+    disk changes nothing until restart, which is silent and easy to miss: a job
+    can run code hours older than the working tree.
+    """
+    import time
+
+    root = Path(__file__).resolve().parent.parent
+    files = list((root / "ghostwriter").glob("*.py")) + list((root / "api").glob("*.py"))
+    newest = max((f.stat().st_mtime for f in files), default=0)
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(newest))
+
+
+logging.getLogger(__name__).info(
+    "ghostwriter engine loaded; newest source file: %s "
+    "(restart after editing - the running process keeps its imported modules)",
+    _code_version(),
+)
+
 app = FastAPI(
     title="GhostWriter API",
     version="1.1.0",

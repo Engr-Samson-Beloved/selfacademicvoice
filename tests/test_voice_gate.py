@@ -314,6 +314,56 @@ def test_gate_is_noop_without_a_profile():
         rewrite._profile_cache, rewrite._profile_loaded, config.VOICE_PROFILE_FILE = saved
 
 
+def test_gate_failure_preserves_the_rewrite():
+    """A provider failure in the refinement pass must not discard finished work.
+
+    One ConnectTimeout during voice gate pass 2 previously propagated out of
+    rewrite_document and destroyed a fully rewritten 383-second document.
+    """
+    original_map = {1: "Public libraries help the community."}
+    good_rewrite = "However, public libraries assist the community greatly."
+    rewrites = {1: good_rewrite}
+
+    def exploding_ask(*a, **k):
+        raise ConnectionError("ConnectTimeout")
+
+    saved = llm.ask
+    llm.ask = exploding_ask
+    try:
+        rewrite._apply_voice_gate(rewrites, original_map, "system")
+    finally:
+        llm.ask = saved
+
+    assert rewrites[1] == good_rewrite, "the rewrite was lost when the gate failed"
+
+
+def test_document_survives_a_failing_refinement_pass():
+    """End to end: the first pass succeeds, every later call fails."""
+    document = ("Public libraries are established to provide timely information "
+                "resources to all members of the community. Education depends on "
+                "the right information at the right time.")
+    state = {"calls": 0}
+
+    def flaky(prompt, system_prompt=None, temperature=None):
+        state["calls"] += 1
+        if state["calls"] > 1:
+            raise ConnectionError("ConnectTimeout")
+        nums = [int(m) for m in re.findall(r"^(\d+)\.", prompt, re.MULTILINE)]
+        return "\n".join(
+            f"{n}. However this is a deliberately breaching rewritten line here." for n in nums
+        )
+
+    saved = llm.ask
+    llm.ask = flaky
+    try:
+        out = rewrite.rewrite_document(document, "system")
+    finally:
+        llm.ask = saved
+
+    assert out.strip(), "document was lost when a later pass failed"
+    assert state["calls"] > 1, "the failing path was never exercised"
+
+
 def test_gate_converges_and_stops():
     """When no repair is accepted the gate must stop, not spend every attempt."""
     original_map = {1: "Public libraries help the community."}

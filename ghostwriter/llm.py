@@ -141,6 +141,10 @@ def _gemini_generate(api_key: str, model: str, prompt: str, system_prompt: str, 
     return response.text.strip()
 
 
+# Floor on the time any one model gets, so a slow first model cannot leave the
+# rest of the rotation unattempted.
+MIN_MODEL_BUDGET = 25.0
+
 DEFAULT_GEMINI_MODELS = [
     "gemini-3.7-flash",
     "gemini-3.6-flash",
@@ -177,15 +181,23 @@ def _ask_gemini(prompt: str, system_prompt: str, temperature: float) -> str:
         raise RuntimeError("No GEMINI_API_KEY set")
     last_err = None
     outcomes: list[str] = []
+    models = _available_models()
     deadline = time.monotonic() + 150.0
-    for model in _available_models():
-        if time.monotonic() >= deadline:
+    for index, model in enumerate(models):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
             outcomes.append(f"{model}: not tried (deadline)")
             continue
+        # Share the remaining budget with the models still to come. Without
+        # this, one model timing out on connect consumed the whole window and
+        # every healthy fallback was skipped with "not tried (deadline)".
+        left = len(models) - index
+        slice_deadline = time.monotonic() + max(MIN_MODEL_BUDGET, remaining / left)
+        model_deadline = min(deadline, slice_deadline)
         for api_key in keys:
             try:
                 return _ask_gemini_with_key(
-                    api_key, model, prompt, system_prompt, temperature, deadline
+                    api_key, model, prompt, system_prompt, temperature, model_deadline
                 )
             except Exception as e:
                 last_err = e
